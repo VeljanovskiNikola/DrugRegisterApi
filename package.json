@@ -1,0 +1,20 @@
+{
+  "name": "mk-drug-register-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "REST API for the North Macedonia drug register (lekovi.zdravstvo.gov.mk/drugsregister)",
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "build:data": "python3 scripts/transform.py raw/drugs_raw.jsonl > public/data/drug-register.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

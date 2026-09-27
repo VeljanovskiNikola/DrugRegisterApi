@@ -1,0 +1,29 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["fra1"],
+  "outputDirectory": "public",
+  "functions": {
+    "api/**/*.ts": {
+      "includeFiles": "public/data/drug-register.json"
+    }
+  },
+  "redirects": [
+    { "source": "/", "destination": "/api/v1/meta", "permanent": false }
+  ],
+  "headers": [
+    {
+      "source": "/data/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=3600, s-maxage=86400" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
+    },
+    {
+      "source": "/openapi.yaml",
+      "headers": [
+        { "key": "Content-Type", "value": "application/yaml; charset=utf-8" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/drug-register.schema.json",
+  "title": "North Macedonia Drug Register",
+  "description": "All drugs from lekovi.zdravstvo.gov.mk/drugsregister. Keys are English camelCase. Macedonian text is kept exactly as on the site. Empty values on the site are null.",
+  "type": "object",
+  "required": ["source", "scrapedDate", "currency", "count", "drugs"],
+  "additionalProperties": false,
+  "properties": {
+    "source": { "type": "string", "format": "uri" },
+    "scrapedDate": { "type": "string", "format": "date" },
+    "currency": { "const": "MKD", "description": "All prices are in Macedonian denars." },
+    "count": { "type": "integer", "minimum": 0 },
+    "drugs": { "type": "array", "items": { "$ref": "#/$defs/Drug" } }
+  },
+  "$defs": {
+    "nullableText": { "type": ["string", "null"], "minLength": 1 },
+    "nullableDate": { "type": ["string", "null"], "format": "date", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "nullablePrice": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+    "nullableUrl": { "type": ["string", "null"], "format": "uri" },
+
+    "Drug": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "detailUrl", "nameLatin", "nameCyrillic", "genericName", "atcCode", "extendedAtcCode", "ean",
+        "pharmaceuticalForm", "strength", "packaging", "composition", "dosage", "dispensing", "productType",
+        "specialWarning", "specialistRecommendation", "manufacturers", "manufacturingSites",
+        "marketingAuthorizationHolder", "authorization", "prices", "isOnPositiveList", "fundCode",
+        "hasBraille", "hasVariations", "documents"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^\\d+$", "description": "Drug ID on the site. String, because IDs are up to 10 digits." },
+        "detailUrl": { "type": "string", "format": "uri", "description": "Detail page on the site." },
+        "nameLatin": { "type": "string", "description": "Име на лекот (латиница)" },
+        "nameCyrillic": { "type": "string", "description": "Име на лекот (кирилица)" },
+        "genericName": { "type": "string", "description": "Генеричко име (INN)" },
+        "atcCode": { "$ref": "#/$defs/nullableText", "description": "АТЦ. Usually 7 characters (J01MA03); some are shorter. One drug lists two codes." },
+        "extendedAtcCode": { "$ref": "#/$defs/nullableText", "description": "Проширен АТЦ, e.g. J01MA03001" },
+        "ean": { "type": ["string", "null"], "pattern": "^\\d+$", "description": "EAN код. String to keep leading zeros. Null when the site shows empty or 0." },
+        "pharmaceuticalForm": { "type": "string", "description": "Фармацевтска форма" },
+        "strength": { "$ref": "#/$defs/nullableText", "description": "Јачина" },
+        "packaging": { "type": "string", "description": "Пакување" },
+        "composition": { "$ref": "#/$defs/nullableText", "description": "Состав. May contain line breaks (\\n)." },
+        "dosage": { "$ref": "#/$defs/nullableText", "description": "Дозирање. Null when the site shows a placeholder (xx, хх, x, /, 0)." },
+        "dispensing": {
+          "enum": ["prescription", "hospitalOnly", "otcPharmacy", "otcGeneralSale"],
+          "description": "Начин на издавање. Rp = prescription, H = hospitalOnly, BRp = otcPharmacy, BR* = otcGeneralSale."
+        },
+        "productType": {
+          "enum": ["generic", "original", "biosimilar"],
+          "description": "Г/О/БС. Г = generic, О = original, БС = biosimilar."
+        },
+        "specialWarning": { "$ref": "#/$defs/nullableText", "description": "Посебни предупредувања. One of 5 texts on the site, kept in Macedonian." },
+        "specialistRecommendation": { "$ref": "#/$defs/nullableText", "description": "Препорака од Специјалист/супспецијалист/конзилиум. Raw code as on the site: R, RS, RSS, RS/RSS, R/RS, R,D." },
+        "manufacturers": { "type": "string", "description": "Производители. One string, as on the site (several are comma-separated)." },
+        "manufacturingSites": { "$ref": "#/$defs/nullableText", "description": "Места на производство. Only on some drugs." },
+        "marketingAuthorizationHolder": { "type": "string", "description": "Носител на одобрение" },
+        "authorization": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["number", "issuedDate", "expiryDate", "renewalDate"],
+          "properties": {
+            "number": { "$ref": "#/$defs/nullableText", "description": "Број на решение" },
+            "issuedDate": { "$ref": "#/$defs/nullableDate", "description": "Датум на решение" },
+            "expiryDate": { "$ref": "#/$defs/nullableDate", "description": "Датум на важност" },
+            "renewalDate": { "$ref": "#/$defs/nullableDate", "description": "Датум на обнова" }
+          }
+        },
+        "prices": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["wholesaleExVat", "retailWithVat", "reference"],
+          "description": "In MKD. Null when the site shows 0 (no price set).",
+          "properties": {
+            "wholesaleExVat": { "$ref": "#/$defs/nullablePrice", "description": "Големопродажна цена без ДДВ" },
+            "retailWithVat": { "$ref": "#/$defs/nullablePrice", "description": "Малопродажна цена со ДДВ" },
+            "reference": { "$ref": "#/$defs/nullablePrice", "description": "Референтна цена" }
+          }
+        },
+        "isOnPositiveList": { "type": "boolean", "description": "Позитивна листа (Да/Не)" },
+        "fundCode": { "$ref": "#/$defs/nullableText", "description": "Фондовска шифра" },
+        "hasBraille": { "type": "boolean", "description": "Браилово писмо (Да/Не)" },
+        "hasVariations": { "type": "boolean", "description": "Варијации (true when the site shows the variations icon)" },
+        "documents": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["smpcUrl", "patientLeafletUrl", "labelUrl"],
+          "description": "PDF links on the site. Null when the drug has no such PDF.",
+          "properties": {
+            "smpcUrl": { "$ref": "#/$defs/nullableUrl", "description": "Збирен извештај (SmPC)" },
+            "patientLeafletUrl": { "$ref": "#/$defs/nullableUrl", "description": "Упатство за употреба (PIL)" },
+            "labelUrl": { "$ref": "#/$defs/nullableUrl", "description": "Налепница/Пакување" }
+          }
+        }
+      }
+    }
+  }
+}

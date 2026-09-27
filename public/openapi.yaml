@@ -1,0 +1,261 @@
+openapi: 3.1.0
+info:
+  title: North Macedonia Drug Register API
+  version: 1.0.0
+  description: |
+    Read-only API for all drugs in the North Macedonia drug register
+    (https://lekovi.zdravstvo.gov.mk/drugsregister).
+
+    - Keys are English camelCase. Macedonian text is kept exactly as on the site.
+    - Empty values on the site are `null`. Every key is always present.
+    - Prices are in MKD. Dates are ISO 8601 date-only strings (`yyyy-MM-dd`).
+    - PDF links point to the site's own URLs.
+servers:
+  - url: https://drugregisterapi.vercel.app
+security: [] # public, read-only API: no auth
+paths:
+  /api/v1/meta:
+    get:
+      operationId: getMeta
+      summary: Dataset info (source, scrape date, count)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Meta" }
+  /api/v1/drugs:
+    get:
+      operationId: listDrugs
+      summary: Search and filter drugs, one page at a time
+      description: |
+        Without `q`, results are sorted by `nameLatin`. With `q`, the best matches come first:
+        name starts with `q`, then generic name starts with `q`, then a word in the name starts
+        with `q`, then `q` anywhere. Search is case- and accent-insensitive and works on Latin
+        and Cyrillic names.
+      parameters:
+        - name: q
+          in: query
+          description: Search text. Matches nameLatin, nameCyrillic and genericName.
+          schema: { type: string, maxLength: 100 }
+        - name: atc
+          in: query
+          description: ATC code prefix, e.g. `N03` or `N03AX14`. Case-insensitive.
+          schema: { type: string, pattern: "^[A-Za-z0-9]{1,10}$" }
+        - name: ean
+          in: query
+          description: Exact EAN barcode.
+          schema: { type: string, pattern: "^[0-9]{8,14}$" }
+        - name: dispensing
+          in: query
+          description: One or more values, comma-separated, e.g. `otcPharmacy,otcGeneralSale`.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items: { $ref: "#/components/schemas/Dispensing" }
+        - name: productType
+          in: query
+          description: One or more values, comma-separated.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items: { $ref: "#/components/schemas/ProductType" }
+        - name: positiveList
+          in: query
+          schema: { type: boolean }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DrugPage" }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /api/v1/drugs/{id}:
+    get:
+      operationId: getDrug
+      summary: One drug by its site ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[0-9]{1,12}$" }
+          example: "54923"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Drug" }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: No drug with this ID
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /data/drug-register.json:
+    get:
+      operationId: getFullDataset
+      summary: All drugs in one file (static, about 7.7 MB, 0.9 MB gzipped)
+      description: Use this to keep a full offline copy in the app.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DrugRegister" }
+components:
+  responses:
+    BadRequest:
+      description: A query parameter is wrong
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+  schemas:
+    Dispensing:
+      type: string
+      description: "Начин на издавање. Rp = prescription, H = hospitalOnly, BRp = otcPharmacy, BR* = otcGeneralSale."
+      enum: [prescription, hospitalOnly, otcPharmacy, otcGeneralSale]
+    ProductType:
+      type: string
+      description: "Г/О/БС. Г = generic, О = original, БС = biosimilar."
+      enum: [generic, original, biosimilar]
+    Meta:
+      type: object
+      required: [source, scrapedDate, currency, count, apiVersion, fullDatasetPath]
+      properties:
+        source: { type: string, format: uri }
+        scrapedDate: { type: string, format: date }
+        currency: { type: string, const: MKD }
+        count: { type: integer }
+        apiVersion: { type: string, const: v1 }
+        fullDatasetPath: { type: string, example: /data/drug-register.json }
+    Pagination:
+      type: object
+      required: [page, limit, total, totalPages]
+      properties:
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer, description: Number of matching drugs }
+        totalPages: { type: integer }
+    DrugPage:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Drug" }
+        pagination: { $ref: "#/components/schemas/Pagination" }
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, enum: [invalidParameter, notFound, internalError] }
+            message: { type: string }
+            parameter: { type: string, description: The query parameter that was wrong }
+    DrugRegister:
+      type: object
+      required: [source, scrapedDate, currency, count, drugs]
+      properties:
+        source: { type: string, format: uri }
+        scrapedDate: { type: string, format: date }
+        currency: { type: string, const: MKD }
+        count: { type: integer }
+        drugs:
+          type: array
+          items: { $ref: "#/components/schemas/Drug" }
+    Authorization:
+      type: object
+      required: [number, issuedDate, expiryDate, renewalDate]
+      properties:
+        number: { type: [string, "null"], description: Број на решение }
+        issuedDate: { type: [string, "null"], format: date, description: Датум на решение }
+        expiryDate: { type: [string, "null"], format: date, description: Датум на важност }
+        renewalDate: { type: [string, "null"], format: date, description: Датум на обнова }
+    Prices:
+      type: object
+      description: In MKD. `null` when the site shows 0 (no price set).
+      required: [wholesaleExVat, retailWithVat, reference]
+      properties:
+        wholesaleExVat: { type: [number, "null"], description: Големопродажна цена без ДДВ }
+        retailWithVat: { type: [number, "null"], description: Малопродажна цена со ДДВ }
+        reference: { type: [number, "null"], description: Референтна цена }
+    Documents:
+      type: object
+      description: PDF links on the site. `null` when the drug has no such PDF.
+      required: [smpcUrl, patientLeafletUrl, labelUrl]
+      properties:
+        smpcUrl: { type: [string, "null"], format: uri, description: Збирен извештај (SmPC) }
+        patientLeafletUrl: { type: [string, "null"], format: uri, description: Упатство за употреба (PIL) }
+        labelUrl: { type: [string, "null"], format: uri, description: Налепница/Пакување }
+    Drug:
+      type: object
+      required:
+        - id
+        - detailUrl
+        - nameLatin
+        - nameCyrillic
+        - genericName
+        - atcCode
+        - extendedAtcCode
+        - ean
+        - pharmaceuticalForm
+        - strength
+        - packaging
+        - composition
+        - dosage
+        - dispensing
+        - productType
+        - specialWarning
+        - specialistRecommendation
+        - manufacturers
+        - manufacturingSites
+        - marketingAuthorizationHolder
+        - authorization
+        - prices
+        - isOnPositiveList
+        - fundCode
+        - hasBraille
+        - hasVariations
+        - documents
+      properties:
+        id: { type: string, description: Drug ID on the site, example: "54923" }
+        detailUrl: { type: string, format: uri }
+        nameLatin: { type: string, description: Име на лекот (латиница) }
+        nameCyrillic: { type: string, description: Име на лекот (кирилица) }
+        genericName: { type: string, description: Генеричко име }
+        atcCode: { type: [string, "null"], description: АТЦ }
+        extendedAtcCode: { type: [string, "null"], description: Проширен АТЦ }
+        ean: { type: [string, "null"], description: EAN код }
+        pharmaceuticalForm: { type: string, description: Фармацевтска форма }
+        strength: { type: [string, "null"], description: Јачина }
+        packaging: { type: string, description: Пакување }
+        composition: { type: [string, "null"], description: Состав. May contain line breaks. }
+        dosage: { type: [string, "null"], description: Дозирање. Null when the site shows a placeholder. }
+        dispensing: { $ref: "#/components/schemas/Dispensing" }
+        productType: { $ref: "#/components/schemas/ProductType" }
+        specialWarning: { type: [string, "null"], description: Посебни предупредувања }
+        specialistRecommendation: { type: [string, "null"], description: "Препорака од Специјалист/супспецијалист/конзилиум. Raw code: R, RS, RSS, RS/RSS, R/RS, R,D." }
+        manufacturers: { type: string, description: Производители }
+        manufacturingSites: { type: [string, "null"], description: Места на производство }
+        marketingAuthorizationHolder: { type: string, description: Носител на одобрение }
+        authorization: { $ref: "#/components/schemas/Authorization" }
+        prices: { $ref: "#/components/schemas/Prices" }
+        isOnPositiveList: { type: boolean, description: Позитивна листа }
+        fundCode: { type: [string, "null"], description: Фондовска шифра }
+        hasBraille: { type: boolean, description: Браилово писмо }
+        hasVariations: { type: boolean, description: Варијации }
+        documents: { $ref: "#/components/schemas/Documents" }
