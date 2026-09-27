@@ -4,6 +4,8 @@ Read-only REST API for all 4,119 drugs in the North Macedonia drug register
 ([lekovi.zdravstvo.gov.mk/drugsregister](https://lekovi.zdravstvo.gov.mk/drugsregister)), scraped on 27.09.2026.
 Runs on Vercel Functions (Node.js 22, TypeScript). No database: the data is one JSON file shipped with the functions.
 
+Live: https://drug-register-api.vercel.app (try [`/api/v1/drugs?q=keppra`](https://drug-register-api.vercel.app/api/v1/drugs?q=keppra))
+
 ## Endpoints
 
 | Method | Path | What it returns |
@@ -68,7 +70,7 @@ so new data shows up right after you deploy it.
 date-only strings work.
 
 ```swift
-let url = URL(string: "https://<your-domain>/api/v1/drugs?q=keppra")!
+let url = URL(string: "https://drug-register-api.vercel.app/api/v1/drugs?q=keppra")!
 let (data, _) = try await URLSession.shared.data(from: url)
 let page = try JSONDecoder.drugRegister().decode(DrugPage.self, from: data)
 ```

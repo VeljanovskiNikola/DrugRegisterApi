@@ -11,7 +11,7 @@ info:
     - Prices are in MKD. Dates are ISO 8601 date-only strings (`yyyy-MM-dd`).
     - PDF links point to the site's own URLs.
 servers:
-  - url: https://drugregisterapi.vercel.app
+  - url: https://drug-register-api.vercel.app
 security: [] # public, read-only API: no auth
 paths:
   /api/v1/meta:
