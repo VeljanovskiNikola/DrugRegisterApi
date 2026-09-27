@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Drug Register API · Docs</title>
+    <meta name="description" content="API docs for the North Macedonia drug register REST API." />
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <!--
+      Scalar API Reference 1.72.1 (MIT license, https://github.com/scalar/scalar).
+      Hosted here instead of a CDN, so the docs don't depend on a third party.
+      To update: npm pack @scalar/api-reference@<version>, copy dist/browser/standalone.js here,
+      rename it with the new version, and change the src below.
+    -->
+    <script src="/docs/scalar-api-reference-1.72.1.js"></script>
+    <script>
+      Scalar.createApiReference("#app", {
+        url: "/openapi.yaml",
+        metaData: { title: "Drug Register API · Docs" },
+        // Show Swift (URLSession) code snippets first.
+        defaultHttpClient: { targetKey: "swift", clientKey: "nsurlsession" },
+        documentDownloadType: "yaml",
+        // Keep the page self-contained: no Scalar fonts, telemetry, AI agent or dev toolbar.
+        withDefaultFonts: false,
+        telemetry: false,
+        agent: { disabled: true },
+        showDeveloperTools: "never",
+      });
+    </script>
+  </body>
+</html>

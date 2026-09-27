@@ -4,7 +4,7 @@ Read-only REST API for all 4,119 drugs in the North Macedonia drug register
 ([lekovi.zdravstvo.gov.mk/drugsregister](https://lekovi.zdravstvo.gov.mk/drugsregister)), scraped on 27.09.2026.
 Runs on Vercel Functions (Node.js 22, TypeScript). No database: the data is one JSON file shipped with the functions.
 
-Live: https://drug-register-api.vercel.app (try [`/api/v1/drugs?q=keppra`](https://drug-register-api.vercel.app/api/v1/drugs?q=keppra))
+Live: https://drug-register-api.vercel.app · Docs: https://drug-register-api.vercel.app/docs
 
 ## Endpoints
 
@@ -15,8 +15,9 @@ Live: https://drug-register-api.vercel.app (try [`/api/v1/drugs?q=keppra`](https
 | GET | `/api/v1/meta` | Source, scrape date, count |
 | GET | `/data/drug-register.json` | All drugs in one static file (7.7 MB, 0.9 MB gzipped), for an offline copy |
 | GET | `/openapi.yaml` | OpenAPI 3.1 spec |
+| GET | `/docs` | Readable API docs with a "Test Request" button (works on a phone) |
 
-`/` redirects to `/api/v1/meta`.
+`/` redirects to `/docs`.
 
 ### `GET /api/v1/drugs` parameters
 
@@ -84,6 +85,7 @@ api/v1/meta.ts            GET /api/v1/meta
 lib/                      data loading, search, HTTP helpers
 public/data/              drug-register.json (served as a static file and read by the functions)
 public/openapi.yaml       API spec
+public/docs/              docs page (Scalar API Reference, hosted here)
 schema/                   JSON Schema for one data file
 scripts/transform.py      raw scrape -> drug-register.json
 raw/                      raw Firecrawl scrape (not deployed)
@@ -114,3 +116,9 @@ npx vercel dev      # local server on http://localhost:3000 (needs a Vercel logi
 3. Click **Deploy**.
 
 Functions run in Frankfurt (`fra1`, set in `vercel.json`), close to users in North Macedonia.
+
+## Third-party code
+
+`public/docs/scalar-api-reference-1.72.1.js` is [Scalar API Reference](https://github.com/scalar/scalar) 1.72.1 (MIT license).
+It is hosted with the API so the docs page doesn't depend on a CDN. Telemetry and Scalar's AI agent are turned off in
+`public/docs/index.html`. To update it, see the comment in that file.

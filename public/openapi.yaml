@@ -24,6 +24,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Meta" }
+              examples:
+                meta: { $ref: "#/components/examples/Meta" }
   /api/v1/drugs:
     get:
       operationId: listDrugs
@@ -38,9 +40,10 @@ paths:
           in: query
           description: Search text. Matches nameLatin, nameCyrillic and genericName.
           schema: { type: string, maxLength: 100 }
+          example: amlodipin
         - name: atc
           in: query
-          description: ATC code prefix, e.g. `N03` or `N03AX14`. Case-insensitive.
+          description: ATC code prefix, e.g. `C08` or `C08CA01`. Case-insensitive.
           schema: { type: string, pattern: "^[A-Za-z0-9]{1,10}$" }
         - name: ean
           in: query
@@ -77,6 +80,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DrugPage" }
+              examples:
+                search: { $ref: "#/components/examples/DrugPage" }
         "400":
           $ref: "#/components/responses/BadRequest"
   /api/v1/drugs/{id}:
@@ -88,13 +93,15 @@ paths:
           in: path
           required: true
           schema: { type: string, pattern: "^[0-9]{1,12}$" }
-          example: "54923"
+          example: "51071"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Drug" }
+              examples:
+                amlodipin: { $ref: "#/components/examples/Drug" }
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -102,6 +109,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+              examples:
+                notFound: { $ref: "#/components/examples/NotFound" }
   /data/drug-register.json:
     get:
       operationId: getFullDataset
@@ -120,6 +129,8 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
+          examples:
+            invalidParameter: { $ref: "#/components/examples/InvalidParameter" }
   schemas:
     Dispensing:
       type: string
@@ -232,7 +243,7 @@ components:
         - hasVariations
         - documents
       properties:
-        id: { type: string, description: Drug ID on the site, example: "54923" }
+        id: { type: string, description: Drug ID on the site, example: "51071" }
         detailUrl: { type: string, format: uri }
         nameLatin: { type: string, description: Име на лекот (латиница) }
         nameCyrillic: { type: string, description: Име на лекот (кирилица) }
@@ -259,3 +270,129 @@ components:
         hasBraille: { type: boolean, description: Браилово писмо }
         hasVariations: { type: boolean, description: Варијации }
         documents: { $ref: "#/components/schemas/Documents" }
+  examples:
+    Meta:
+      summary: "Dataset info"
+      value: {
+          "source": "https://lekovi.zdravstvo.gov.mk/drugsregister",
+          "scrapedDate": "2026-09-27",
+          "currency": "MKD",
+          "count": 4119,
+          "apiVersion": "v1",
+          "fullDatasetPath": "/data/drug-register.json"
+        }
+    Drug:
+      summary: "AMLODIPIN 5 mg"
+      value: {
+          "id": "51071",
+          "detailUrl": "https://lekovi.zdravstvo.gov.mk/drugsregister/detailview/51071",
+          "nameLatin": "AMLODIPIN",
+          "nameCyrillic": "АМЛОДИПИН",
+          "genericName": "amlodipine",
+          "atcCode": "C08CA01",
+          "extendedAtcCode": "C08CA01001",
+          "ean": "5310090003085",
+          "pharmaceuticalForm": "таблета",
+          "strength": "5 mg",
+          "packaging": "20 таблети (блистер 2 х 10)/кутија",
+          "composition": "1 таблета содржи:\nамлодипин бесилат . . . 7 mg  \n(еквивалентен на 5 mg амлодипин)",
+          "dosage": "1 х 5-10 mg на ден (max.10 mg на ден).",
+          "dispensing": "prescription",
+          "productType": "generic",
+          "specialWarning": null,
+          "specialistRecommendation": "R",
+          "manufacturers": "РЕПЛЕК ФАРМ ДООЕЛ СКОПЈЕ, Скопје, Р. Северна Македонија",
+          "manufacturingSites": null,
+          "marketingAuthorizationHolder": "РЕПЛЕК ФАРМ ДООЕЛ СКОПЈЕ",
+          "authorization": {
+            "number": "11-6470/2",
+            "issuedDate": "2019-10-17",
+            "expiryDate": null,
+            "renewalDate": null
+          },
+          "prices": {
+            "wholesaleExVat": 34,
+            "retailWithVat": 44.1,
+            "reference": 17.74
+          },
+          "isOnPositiveList": true,
+          "fundCode": "976423",
+          "hasBraille": true,
+          "hasVariations": false,
+          "documents": {
+            "smpcUrl": "https://lekovi.zdravstvo.gov.mk/drugsregister.detaileddrugsregistercomponent:downloadguide/51071?t:ac=detailview/51071",
+            "patientLeafletUrl": "https://lekovi.zdravstvo.gov.mk/drugsregister.detaileddrugsregistercomponent:downloadreport/51071?t:ac=detailview/51071",
+            "labelUrl": null
+          }
+        }
+    DrugPage:
+      summary: "Search: ?q=amlodipin&limit=1"
+      value: {
+          "data": [
+            {
+              "id": "51071",
+              "detailUrl": "https://lekovi.zdravstvo.gov.mk/drugsregister/detailview/51071",
+              "nameLatin": "AMLODIPIN",
+              "nameCyrillic": "АМЛОДИПИН",
+              "genericName": "amlodipine",
+              "atcCode": "C08CA01",
+              "extendedAtcCode": "C08CA01001",
+              "ean": "5310090003085",
+              "pharmaceuticalForm": "таблета",
+              "strength": "5 mg",
+              "packaging": "20 таблети (блистер 2 х 10)/кутија",
+              "composition": "1 таблета содржи:\nамлодипин бесилат . . . 7 mg  \n(еквивалентен на 5 mg амлодипин)",
+              "dosage": "1 х 5-10 mg на ден (max.10 mg на ден).",
+              "dispensing": "prescription",
+              "productType": "generic",
+              "specialWarning": null,
+              "specialistRecommendation": "R",
+              "manufacturers": "РЕПЛЕК ФАРМ ДООЕЛ СКОПЈЕ, Скопје, Р. Северна Македонија",
+              "manufacturingSites": null,
+              "marketingAuthorizationHolder": "РЕПЛЕК ФАРМ ДООЕЛ СКОПЈЕ",
+              "authorization": {
+                "number": "11-6470/2",
+                "issuedDate": "2019-10-17",
+                "expiryDate": null,
+                "renewalDate": null
+              },
+              "prices": {
+                "wholesaleExVat": 34,
+                "retailWithVat": 44.1,
+                "reference": 17.74
+              },
+              "isOnPositiveList": true,
+              "fundCode": "976423",
+              "hasBraille": true,
+              "hasVariations": false,
+              "documents": {
+                "smpcUrl": "https://lekovi.zdravstvo.gov.mk/drugsregister.detaileddrugsregistercomponent:downloadguide/51071?t:ac=detailview/51071",
+                "patientLeafletUrl": "https://lekovi.zdravstvo.gov.mk/drugsregister.detaileddrugsregistercomponent:downloadreport/51071?t:ac=detailview/51071",
+                "labelUrl": null
+              }
+            }
+          ],
+          "pagination": {
+            "page": 1,
+            "limit": 1,
+            "total": 78,
+            "totalPages": 78
+          }
+        }
+    InvalidParameter:
+      summary: "?limit=500"
+      value: {
+          "error": {
+            "code": "invalidParameter",
+            "message": "limit must be 100 or less.",
+            "parameter": "limit"
+          }
+        }
+    NotFound:
+      summary: "Unknown id"
+      value: {
+          "error": {
+            "code": "notFound",
+            "message": "No drug with id 1."
+          }
+        }
