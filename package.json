@@ -10,11 +10,19 @@
   "scripts": {
     "build:data": "python3 scripts/transform.py raw/drugs_raw.jsonl > public/data/drug-register.json",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:security": "vitest run --config vitest.security.config.ts",
+    "test:all": "npm test && npm run test:security",
+    "serve:local": "node scripts/local-server.mjs --port 3000"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",
+    "playwright-core": "1.56",
     "typescript": "^5.9.3",
     "vitest": "^3.2.7"
+  },
+  "dependencies": {
+    "@upstash/ratelimit": "^2.2.0",
+    "@upstash/redis": "^1.39.0"
   }
 }

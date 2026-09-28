@@ -10,9 +10,34 @@ info:
     - Empty values on the site are `null`. Every key is always present.
     - Prices are in MKD. Dates are ISO 8601 date-only strings (`yyyy-MM-dd`).
     - PDF links point to the site's own URLs.
+
+    ## Authentication
+    Every `/api/v1/*` call needs an API token in the `Authorization` header:
+    `Authorization: Bearer <token>`. Tokens in the query string, cookies or other headers are ignored.
+    A missing or wrong token gets `401` with a `WWW-Authenticate: Bearer realm="drug-register-api"` header.
+    `/docs`, `/openapi.yaml` and `/data/drug-register.json` need no token.
+
+    The data is public, so the token is an app ID and a quota key, not a secret that protects the data.
+
+    ## Rate limits
+    Per IP and per token (defaults: 120 and 3,000 requests per minute). Over the limit you get `429`
+    with a `Retry-After` header (seconds). Wait that long, then retry.
+
+    ## Errors
+    Every error has the same JSON shape: `{ "error": { "code", "message", "parameter"? } }`.
+    Codes: `invalidParameter` (400), `unauthorized` (401), `notFound` (404), `methodNotAllowed` (405),
+    `rateLimited` (429), `internalError` (500). Only `GET` and `HEAD` are allowed; other methods get `405`
+    with `Allow: GET, HEAD`. Unknown or repeated query parameters get `400`.
+
+    ## Headers
+    API responses send `Cache-Control: private, max-age=300` (200) or `no-store` (errors),
+    `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`,
+    `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` and `Vary: Authorization`.
+    There are no CORS headers: the API is meant for apps, not for web pages on other sites.
 servers:
   - url: https://drug-register-api.vercel.app
-security: [] # public, read-only API: no auth
+security:
+  - bearerAuth: []
 paths:
   /api/v1/meta:
     get:
@@ -26,6 +51,10 @@ paths:
               schema: { $ref: "#/components/schemas/Meta" }
               examples:
                 meta: { $ref: "#/components/examples/Meta" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /api/v1/drugs:
     get:
       operationId: listDrugs
@@ -35,10 +64,12 @@ paths:
         name starts with `q`, then generic name starts with `q`, then a word in the name starts
         with `q`, then `q` anywhere. Search is case- and accent-insensitive and works on Latin
         and Cyrillic names.
+
+        Each parameter may appear once. Unknown parameters get `400`. A page has at most 100 drugs.
       parameters:
         - name: q
           in: query
-          description: Search text. Matches nameLatin, nameCyrillic and genericName.
+          description: Search text, 1–100 characters. Matches nameLatin, nameCyrillic and genericName.
           schema: { type: string, maxLength: 100 }
           example: amlodipin
         - name: atc
@@ -70,7 +101,7 @@ paths:
           schema: { type: boolean }
         - name: page
           in: query
-          schema: { type: integer, minimum: 1, default: 1 }
+          schema: { type: integer, minimum: 1, maximum: 10000, default: 1 }
         - name: limit
           in: query
           schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
@@ -84,6 +115,10 @@ paths:
                 search: { $ref: "#/components/examples/DrugPage" }
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /api/v1/drugs/{id}:
     get:
       operationId: getDrug
@@ -111,11 +146,18 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               examples:
                 notFound: { $ref: "#/components/examples/NotFound" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /data/drug-register.json:
     get:
       operationId: getFullDataset
       summary: All drugs in one file (static, about 7.7 MB, 0.9 MB gzipped)
-      description: Use this to keep a full offline copy in the app.
+      description: |
+        Use this to keep a full offline copy in the app. Public: no token and no rate limit in code
+        (it's a static file served by the CDN). It is the only way to get the whole dataset in one request.
+      security: []
       responses:
         "200":
           description: OK
@@ -123,7 +165,34 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/DrugRegister" }
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: "API token from the app's configuration. Send as `Authorization: Bearer <token>`."
   responses:
+    Unauthorized:
+      description: Missing or wrong API token
+      headers:
+        WWW-Authenticate:
+          description: '`Bearer realm="drug-register-api"`, plus `error="invalid_token"` when a token was sent'
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          examples:
+            unauthorized: { $ref: "#/components/examples/Unauthorized" }
+    TooManyRequests:
+      description: Rate limit reached (per IP or per token)
+      headers:
+        Retry-After:
+          description: Seconds to wait before trying again
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          examples:
+            rateLimited: { $ref: "#/components/examples/RateLimited" }
     BadRequest:
       description: A query parameter is wrong
       content:
@@ -174,7 +243,9 @@ components:
           type: object
           required: [code, message]
           properties:
-            code: { type: string, enum: [invalidParameter, notFound, internalError] }
+            code:
+              type: string
+              enum: [invalidParameter, unauthorized, notFound, methodNotAllowed, rateLimited, internalError]
             message: { type: string }
             parameter: { type: string, description: The query parameter that was wrong }
     DrugRegister:
@@ -394,5 +465,21 @@ components:
           "error": {
             "code": "notFound",
             "message": "No drug with id 1."
+          }
+        }
+    Unauthorized:
+      summary: "No token"
+      value: {
+          "error": {
+            "code": "unauthorized",
+            "message": "Missing API token. Send the header Authorization: Bearer <token>."
+          }
+        }
+    RateLimited:
+      summary: "Too many requests"
+      value: {
+          "error": {
+            "code": "rateLimited",
+            "message": "Too many requests. Try again in 12 seconds."
           }
         }

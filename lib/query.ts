@@ -24,44 +24,81 @@ export class QueryError extends Error {
   }
 }
 
-const KNOWN_PARAMS = new Set(["q", "atc", "ean", "dispensing", "productType", "positiveList", "page", "limit"]);
+export const MAX_PAGE = 10_000;
+export const MAX_Q_LENGTH = 100;
+/** No parameter value needs more than this. Checked before any other work on the value. */
+const MAX_VALUE_LENGTH = 200;
+
+// A Set lookup, not an object, so names like "__proto__" or "constructor" are just unknown strings.
+const KNOWN_PARAMS: ReadonlySet<string> = new Set([
+  "q",
+  "atc",
+  "ean",
+  "dispensing",
+  "productType",
+  "positiveList",
+  "page",
+  "limit",
+]);
+
+/** Shortens user input before it goes into an error message. */
+export function echo(value: string): string {
+  const clean = value.replace(/[\u0000-\u001f\u007f]/g, "?");
+  return clean.length > 40 ? `${clean.slice(0, 40)}…` : clean;
+}
+
+/**
+ * Rejects unknown and repeated parameters, and over-long values.
+ * Repeated parameters are refused so "limit=10&limit=1000" can't be read differently by different code.
+ */
+export function checkParams(params: URLSearchParams, known: ReadonlySet<string>): void {
+  const seen = new Set<string>();
+  for (const [key, value] of params) {
+    if (!known.has(key)) throw new QueryError(echo(key), `Unknown parameter "${echo(key)}".`);
+    if (seen.has(key)) throw new QueryError(key, `Parameter "${key}" appears more than once.`);
+    seen.add(key);
+    if (value.length > MAX_VALUE_LENGTH) throw new QueryError(key, `${key} is too long.`);
+  }
+}
 
 function parseEnumList<T extends string>(name: string, raw: string, allowed: readonly T[]): T[] {
   const values = raw.split(",").map((v) => v.trim()).filter(Boolean);
   if (values.length === 0) throw new QueryError(name, `${name} must not be empty.`);
   for (const v of values) {
     if (!allowed.includes(v as T)) {
-      throw new QueryError(name, `${name} must be one of: ${allowed.join(", ")}. Got "${v}".`);
+      throw new QueryError(name, `${name} must be one of: ${allowed.join(", ")}. Got "${echo(v)}".`);
     }
   }
   return values as T[];
 }
 
-function parsePositiveInt(name: string, raw: string | null, fallback: number, max?: number): number {
+function parsePositiveInt(name: string, raw: string | null, fallback: number, max: number): number {
   if (raw === null) return fallback;
   if (!/^\d+$/.test(raw)) throw new QueryError(name, `${name} must be a whole number.`);
+  // Too many digits is too big, before Number() can round it.
+  if (raw.length > 6) throw new QueryError(name, `${name} must be ${max} or less.`);
   const n = Number(raw);
   if (n < 1) throw new QueryError(name, `${name} must be 1 or more.`);
-  if (max !== undefined && n > max) throw new QueryError(name, `${name} must be ${max} or less.`);
+  if (n > max) throw new QueryError(name, `${name} must be ${max} or less.`);
   return n;
 }
 
 /** Reads and checks the query string. Throws QueryError on bad input. */
 export function parseDrugQuery(params: URLSearchParams): DrugQuery {
-  for (const key of params.keys()) {
-    if (!KNOWN_PARAMS.has(key)) throw new QueryError(key, `Unknown parameter "${key}".`);
-  }
+  checkParams(params, KNOWN_PARAMS);
 
   const query: DrugQuery = {
-    page: parsePositiveInt("page", params.get("page"), 1),
+    page: parsePositiveInt("page", params.get("page"), 1, MAX_PAGE),
     limit: parsePositiveInt("limit", params.get("limit"), DEFAULT_LIMIT, MAX_LIMIT),
   };
 
   const q = params.get("q");
   if (q !== null) {
+    // Length check on the raw value first, so no work is done on huge input.
+    if (q.length > MAX_Q_LENGTH) throw new QueryError("q", `q must be ${MAX_Q_LENGTH} characters or less.`);
     const text = normalize(q);
     if (text.length === 0) throw new QueryError("q", "q must not be empty.");
-    if (text.length > 100) throw new QueryError("q", "q must be 100 characters or less.");
+    if (text.length > MAX_Q_LENGTH) throw new QueryError("q", `q must be ${MAX_Q_LENGTH} characters or less.`);
     query.q = text;
   }
 
