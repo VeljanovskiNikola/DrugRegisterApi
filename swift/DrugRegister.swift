@@ -29,14 +29,50 @@ struct RegisterMeta: Codable, Sendable {
     let fullDatasetPath: String   // "/data/drug-register.json", relative to the API host
 }
 
-/// Body of every 4xx/5xx response.
+/// Body of every 4xx/5xx response from /api/v1/*.
 struct APIErrorResponse: Codable, Sendable, Error {
     struct Detail: Codable, Sendable {
-        let code: String          // invalidParameter, notFound, internalError
+        /// Raw code. Kept as a String so a new code on the server never breaks decoding. Use `kind`.
+        let code: String
         let message: String
+        /// The query parameter that was wrong (400 only).
         let parameter: String?
+
+        var kind: APIErrorCode { APIErrorCode(rawValue: code) ?? .unknown }
     }
     let error: Detail
+}
+
+/// Error codes. HTTP status in brackets.
+enum APIErrorCode: String, Sendable {
+    case invalidParameter   // 400: bad or repeated query parameter
+    case unauthorized       // 401: missing or wrong token (see WWW-Authenticate)
+    case notFound           // 404: no such drug or endpoint
+    case methodNotAllowed   // 405: only GET and HEAD are allowed
+    case rateLimited        // 429: wait `Retry-After` seconds, then retry
+    case internalError      // 500
+    case unknown
+}
+
+// MARK: - Auth and rate limits
+
+// Every /api/v1/* request needs `Authorization: Bearer <token>`.
+// /data/drug-register.json and /docs need no token.
+// Keep the token out of source control (e.g. an .xcconfig that's git-ignored). It still ships inside the
+// app binary, so treat it as an app ID and quota key, not as a secret.
+
+extension URLRequest {
+    /// Adds `Authorization: Bearer <token>`.
+    mutating func setDrugRegisterToken(_ token: String) {
+        setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    }
+}
+
+extension HTTPURLResponse {
+    /// Seconds to wait after a 429 (from the `Retry-After` header).
+    var retryAfterSeconds: Int? {
+        (value(forHTTPHeaderField: "Retry-After")).flatMap { Int($0) }
+    }
 }
 
 /// GET /data/drug-register.json (all drugs, for an offline copy)

@@ -5,9 +5,14 @@ import { GET as getMeta } from "../api/v1/meta.js";
 import type { Drug, DrugPage, Meta } from "../lib/types.js";
 
 const BASE = "https://api.test";
+// Set in vitest.config.ts. Handlers now need a Bearer token and are async.
+const AUTH = { Authorization: `Bearer ${process.env.TEST_API_TOKEN}` };
 
-async function call<T>(handler: (r: Request) => Response, path: string): Promise<{ status: number; body: T; res: Response }> {
-  const res = handler(new Request(BASE + path));
+async function call<T>(
+  handler: (r: Request) => Response | Promise<Response>,
+  path: string,
+): Promise<{ status: number; body: T; res: Response }> {
+  const res = await handler(new Request(BASE + path, { headers: AUTH }));
   return { status: res.status, body: (await res.json()) as T, res };
 }
 
@@ -28,8 +33,9 @@ describe("GET /api/v1/drugs", () => {
     expect(body.data).toHaveLength(20);
     expect(body.pagination).toEqual({ page: 1, limit: 20, total: 4119, totalPages: 206 });
     expect(res.headers.get("content-type")).toBe("application/json; charset=utf-8");
-    expect(res.headers.get("access-control-allow-origin")).toBe("*");
-    expect(res.headers.get("cache-control")).toContain("s-maxage=86400");
+    // Header policy changed on purpose in the security PR: no CORS, and no shared (CDN) caching.
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
+    expect(res.headers.get("cache-control")).toBe("private, max-age=300");
   });
 
   it("pages through all drugs without gaps or repeats", async () => {
